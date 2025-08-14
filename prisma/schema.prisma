@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  dateOfBirth   DateTime? // Necessario per verifica età
+  isAgeVerified Boolean   @default(false) // Verifica maggiore età
+  role          UserRole  @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses Address[]
+  orders    Order[]
+  reviews   Review[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  image       String?
+  parentId    String?
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+
+  nameEn        String?
+  descritpionEn String?
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  description      String
+  shortDescription String?
+  price            Decimal  @db.Decimal(10, 2)
+  comparePrice     Decimal? @db.Decimal(10, 2)
+  sku              String   @unique // Stock Keeping Unit, codice prodotto interno
+  barcode          String?
+
+  // Campi per tracciabilità delle bevande alcoliche
+  batchNumber    String // numero di lotto - OBBLIGATORIO PER LEGGE
+  productionDate DateTime
+  expiryDate     DateTime?
+  bestByDate     DateTime? // "da cosnumarsi preferibilmente entro il ..."
+
+  inventory    Int      @default(0)
+  minInventory Int      @default(0)
+  weight       Decimal? @db.Decimal(8, 2)
+  volume       Int? // volume in ml OBBLIGATORIO PER ALCOLICI
+  dimension    String?
+
+  isActive               Boolean @default(true)
+  isFeatured             Boolean @default(false)
+  isAlcoholic            Boolean @default(true) // per distinguere dal merchandising
+  requireAgeVerification Boolean @default(true)
+
+  // Informazioni Specifiche
+  alcoholContent Decimal @db.Decimal(4, 2) // % vol - OBBLIGATORIO PER ALCOLICI
+  origin         String?
+  producere      String?
+  distillery     String?
+
+  // botaniche utilizzate (per gin)
+  botanicals   String? // JSON con array delle botaniche utilizzate
+  botanicalsEn String?
+
+  // Informazioni nutrizionali
+  energyValuePer100ml   Decimal? @db.Decimal(8, 2) // KJ per 100ml
+  caloriesPer100ml      Decimal? @db.Decimal(8, 2) // kcal per 100ml
+  carbohydratesPer100ml Decimal? @db.Decimal(8, 2) // g per 100ml
+  sugarsPer100ml        Decimal  @db.Decimal(8, 2) // g per 100ml
+  fatPer100ml           Decimal  @db.Decimal(8, 2) // g per 100ml
+  proteinPer100ml       Decimal  @db.Decimal(8, 2) // g per 100ml
+  saltPer100ml          Decimal  @db.Decimal(8, 2) // g per 100ml
+
+  // Allergeni
+  allergens   String? // JSON con array degli allergeni
+  allergensEn String?
+
+  // Conservazione
+  storageInstructions   String?
+  storageInstructionsEn String?
+
+  // Avvertenze Legali
+  legalWarnings   String?
+  legalWarningsEn String?
+
+  // Certificazioni
+  certifications   String? // JSON: biologico, kosher, vegano etc.
+  certificationsEn String?
+
+  // Campi multilingua
+  nameEn             String?
+  descriptionEn      String?
+  shortDescriptionEn String?
+  originEn           String?
+  producerEn         String?
+  distilleryEn       String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  images     ProductImage[]
+  variants   ProductVariant[]
+  batches    ProductBatch[] // Gestione lotti multipli
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("products")
+}
+
+model ProductBatch {
+  id             String    @id @default(cuid())
+  batchNumber    String
+  productionDate DateTime
+  expiryDate     DateTime?
+  bestByDate     DateTime?
+  quantity       Int // quantità iniziale in questo lotto
+  remainingQty   Int // quantità rimanente di questo lotto
+  notes          String? // note specifiche per il lotto
+  isActive       Boolean   @default(true)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  orderItems OrderItem[] // Per tracciare quale lotto è stato venduto
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, batchNumber])
+  @@map("product_batches")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  alt       String
+  position  Int     @default(0)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  name      String // es: bottiglia da 50cl, bottiglia da 75cl
+  value     String
+  price     Decimal? @db.Decimal(10, 2)
+  sku       String?
+  volume    Int? // volume specifico della variante
+  inventroy Int      @default(0)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+model Address {
+  id         String      @id @default(cuid())
+  type       AddressType @default(SHIPPING)
+  firstName  String
+  lastName   String
+  company    String?
+  address1   String
+  address2   String?
+  city       String
+  province   String
+  postalCode String
+  country    String      @default("IT")
+  phone      String?
+  isDefault  Boolean     @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  shippingOrders Order[] @relation("ShippingAddress")
+  billingOrders  Order[] @relation("BillingAddress")
+
+  @@map("addresses")
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String?
+
+  subtotal       Decimal @db.Decimal(10, 2)
+  taxAmount      Decimal @db.Decimal(10, 2) @default(0)
+  shippingAmount Decimal @db.Decimal(10, 2) @default(0)
+  discountAmount Decimal @db.Decimal(10, 2) @default(0)
+  total          Decimal @db.Decimal(10, 2)
+
+  currency String @default("EUR")
+
+  // Campi specifici per la vendita di alcolici
+  requiresAdultSignature Boolean   @default(true)
+  trackingNumber         String?
+  carrierName            String?
+  shippingDate           DateTime?
+  deliveryDater          DateTime?
+
+  notes String?
+
+  shippingAddressId String
+  billingAddressId  String
+  shippingAddress   Address @relation("ShippingAddress", fields: [shippingAddressId], references: [id])
+  billingAddress    Address @relation("BillingAddress", fields: [billingAddressId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("orders")
+}
