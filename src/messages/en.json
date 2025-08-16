@@ -1,0 +1,28 @@
+{
+  "navigation": {
+    "home": "Home",
+    "products": "Products",
+    "about": "About Us",
+    "contact": "Contact",
+    "cart": "Cart",
+    "login": "Login",
+    "register": "Sign Up"
+  },
+  "hero": {
+    "title": "Rebus International Srl",
+    "subtitle": "Distributor for Italy of DryCat Gin",
+    "cta": "Explore Collection"
+  },
+  "products": {
+    "title": "Our Gins",
+    "viewAll": "View All",
+    "addToCart": "Add to Cart",
+    "outOfStock": "Out of Stock"
+  },
+  "cart": {
+    "title": "Cart",
+    "empty": "Your cart is empty",
+    "total": "Total",
+    "checkout": "Proceed to Checkout"
+  }
+}

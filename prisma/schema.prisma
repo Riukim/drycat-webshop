@@ -18,13 +18,36 @@ model User {
   dateOfBirth   DateTime? // Necessario per verifica età
   isAgeVerified Boolean   @default(false) // Verifica maggiore età
   role          UserRole  @default(CUSTOMER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+
+  // Campi GDPR
+  gdprConsent          Boolean   @default(false) // Consenso generale al trattamento
+  gdprConsentDate      DateTime? // Data del consenso
+  gdprConsentVersion   String? // Versione della privacy policy accettata
+  marketingConsent     Boolean   @default(false) // Consenso marketing
+  marketingConsentDate DateTime?
+  profilingConsent     Boolean   @default(false) // Consenso profilazione
+  profilingConsentDate DateTime?
+  cookieConsent        Json? // Consensi specifici per cookie
+  cookieConsentDate    DateTime?
+
+  // Gestione dati sensibili
+  isDataMinimized   Boolean       @default(false) // Se i dati sono stati minimizzati
+  dataRetentionDate DateTime? // Data oltre la quale i dati dovrebbero essere cancellati
+  lastLoginDate     DateTime? // Per calcolare inattività
+  accountStatus     AccountStatus @default(ACTIVE)
+
+  // Log delle richieste GDPR
+  gdprRequests GdprRequest[]
 
   addresses Address[]
   orders    Order[]
   reviews   Review[]
+  auditLogs AuditLog[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
   @@map("users")
 }
 
@@ -39,10 +62,11 @@ model Category {
   children    Category[] @relation("CategoryHierarchy")
 
   nameEn        String?
-  descritpionEn String?
+  descriptionEn String?
 
   products Product[]
 
+  @@index([slug])
   @@map("categories")
 }
 
@@ -69,44 +93,45 @@ model Product {
   volume       Int? // volume in ml OBBLIGATORIO PER ALCOLICI
   dimension    String?
 
-  isActive               Boolean @default(true)
-  isFeatured             Boolean @default(false)
-  isAlcoholic            Boolean @default(true) // per distinguere dal merchandising
-  requireAgeVerification Boolean @default(true)
+  isActive                Boolean @default(true)
+  isFeatured              Boolean @default(false)
+  isAlcoholic             Boolean @default(true) // per distinguere dal merchandising
+  requiresAgeVerification Boolean @default(true)
 
   // Informazioni Specifiche
   alcoholContent Decimal @db.Decimal(4, 2) // % vol - OBBLIGATORIO PER ALCOLICI
   origin         String?
-  producere      String?
+  producer       String?
   distillery     String?
 
   // botaniche utilizzate (per gin)
-  botanicals   String? // JSON con array delle botaniche utilizzate
+  botanicals   Json? // JSON con array delle botaniche utilizzate
   botanicalsEn String?
 
-  // Informazioni nutrizionali
-  energyValuePer100ml   Decimal? @db.Decimal(8, 2) // KJ per 100ml
+  // Informazioni nutrizionali (richieste dalla normativa EU)
+  energyValuePer100ml   Decimal? @db.Decimal(8, 2) // kJ per 100ml
   caloriesPer100ml      Decimal? @db.Decimal(8, 2) // kcal per 100ml
   carbohydratesPer100ml Decimal? @db.Decimal(8, 2) // g per 100ml
-  sugarsPer100ml        Decimal  @db.Decimal(8, 2) // g per 100ml
-  fatPer100ml           Decimal  @db.Decimal(8, 2) // g per 100ml
-  proteinPer100ml       Decimal  @db.Decimal(8, 2) // g per 100ml
-  saltPer100ml          Decimal  @db.Decimal(8, 2) // g per 100ml
+  sugarsPer100ml        Decimal? @db.Decimal(8, 2) // g per 100ml
+  fatPer100ml           Decimal? @db.Decimal(8, 2) // g per 100ml
+  saturatedFatPer100ml  Decimal? @db.Decimal(8, 2) // g per 100ml
+  proteinPer100ml       Decimal? @db.Decimal(8, 2) // g per 100ml
+  saltPer100ml          Decimal? @db.Decimal(8, 2) // g per 100ml
 
   // Allergeni
-  allergens   String? // JSON con array degli allergeni
+  allergens   Json? // JSON con array degli allergeni
   allergensEn String?
 
   // Conservazione
   storageInstructions   String?
   storageInstructionsEn String?
 
-  // Avvertenze Legali
-  legalWarnings   String?
+  // Avvertenze legali (aggiunte automaticamente in base al contenuto alcolico)
+  legalWarnings   String? // "Vietato ai minori di 18 anni", etc.
   legalWarningsEn String?
 
   // Certificazioni
-  certifications   String? // JSON: biologico, kosher, vegano etc.
+  certifications   Json? // JSON: biologico, kosher, vegano etc.
   certificationsEn String?
 
   // Campi multilingua
@@ -125,10 +150,13 @@ model Product {
   batches    ProductBatch[] // Gestione lotti multipli
   orderItems OrderItem[]
   reviews    Review[]
+  salesLog   SalesLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([slug])
+  @@index([categoryId])
   @@map("products")
 }
 
@@ -173,10 +201,11 @@ model ProductVariant {
   price     Decimal? @db.Decimal(10, 2)
   sku       String?
   volume    Int? // volume specifico della variante
-  inventroy Int      @default(0)
+  inventory Int      @default(0)
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([productId])
   @@map("product_variants")
 }
 
@@ -212,19 +241,25 @@ model Order {
   paymentMethod String?
 
   subtotal       Decimal @db.Decimal(10, 2)
-  taxAmount      Decimal @db.Decimal(10, 2) @default(0)
-  shippingAmount Decimal @db.Decimal(10, 2) @default(0)
-  discountAmount Decimal @db.Decimal(10, 2) @default(0)
+  taxAmount      Decimal @default(0) @db.Decimal(10, 2)
+  shippingAmount Decimal @default(0) @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
   total          Decimal @db.Decimal(10, 2)
 
   currency String @default("EUR")
+
+  // Campi specifici per vendita alcolici
+  ageVerificationRequired  Boolean   @default(true)
+  ageVerificationCompleted Boolean   @default(false)
+  ageVerificationDate      DateTime?
+  ageVerificationMethod    String? // "ID_DOCUMENT", "CREDIT_CARD", etc.
 
   // Campi specifici per la vendita di alcolici
   requiresAdultSignature Boolean   @default(true)
   trackingNumber         String?
   carrierName            String?
   shippingDate           DateTime?
-  deliveryDater          DateTime?
+  deliveryDate           DateTime?
 
   notes String?
 
@@ -236,10 +271,374 @@ model Order {
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  items OrderItem[]
+  items              OrderItem[]
+  paymentTransaction PaymentTransaction? @relation("OrderPaymentTransaction")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([orderNumber])
+  @@index([userId])
+  @@index([shippingAddressId])
+  @@index([billingAddressId])
   @@map("orders")
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  quantity Int
+  price    Decimal @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+
+  // Tracciabilità del lotto venduto
+  batchId String?
+  batch   ProductBatch? @relation(fields: [batchId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Review {
+  id         String  @id @default(cuid())
+  rating     Int
+  title      String
+  comment    String
+  isApproved Boolean @default(false)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+}
+
+model Setting {
+  id    String      @id @default(cuid())
+  key   String      @unique
+  value String
+  type  SettingType @default(STRING)
+
+  @@map("settings")
+}
+
+// Tabella per la gestione delle restrizioni geografiche di vendita
+model ShoppingRestriction {
+  id         String  @id @default(cuid())
+  country    String
+  region     String?
+  city       String?
+  postalCode String?
+  isAllowed  Boolean @default(true)
+  reason     String? // "LEGAL_RESTRICTION, SHIPPING_LIMITATION" ETC...
+  minAge     Int     @default(18)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("shipping_restrictions")
+}
+
+// Log per la tracciabilità delle vendite
+model SalesLog {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String?
+  batchId         String?
+  quantity        Int
+  customerAge     Int?
+  saleDate        DateTime @default(now())
+  customerCountry String
+  customerRegion  String
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([batchId])
+  @@map("sales_logs")
+}
+
+// Tabella per gestire richieste GDPR
+model GdprRequest {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  requestType    GdprRequestType
+  status         GdprRequestStatus @default(PENDING)
+  requestDate    DateTime          @default(now())
+  completionDate DateTime?
+
+  // Dettagli della richiesta
+  description  String?
+  response     String?
+  dataExported Json? // Per richieste di portabilità
+
+  // Informazioni processuali
+  processedBy String? // ID dell'admin che ha processato
+  legalBasis  String? // Base legale del trattamento
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("gdpr_requests")
+}
+
+// Log di audit per tracciare accessi e modifiche (GDPR requirement)
+model AuditLog {
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action     String // "LOGIN", "DATA_ACCESS", "DATA_MODIFY", "EXPORT", etc.
+  resource   String // "USER", "ORDER", "PRODUCT", etc.
+  resourceId String?
+
+  ipAddress String?
+  userAgent String?
+  sessionId String?
+
+  // Dati prima e dopo la modifica (per auditing)
+  oldData Json?
+  newData Json?
+
+  timestamp DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// Gestione consensi per cookie e tracking
+model ConsentRecord {
+  id        String  @id @default(cuid())
+  sessionId String // Per visitatori non registrati
+  userId    String? // Per utenti registrati
+
+  consentType    String // "FUNCTIONAL", "ANALYTICS", "MARKETING", "ADVERTISING"
+  consentGiven   Boolean
+  consentDate    DateTime @default(now())
+  consentVersion String // Versione della cookie policy
+
+  ipAddress String
+  userAgent String?
+
+  // Dettagli specifici del consenso
+  purposes Json? // Array dei purpose specifici
+  duration Int? // Durata in giorni
+
+  expiryDate DateTime?
+  isActive   Boolean   @default(true)
+
+  legalDocumentId String?
+  legalDocument   LegalDocument? @relation(fields: [legalDocumentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("consent_records")
+}
+
+// Gestione delle politiche privacy/cookie
+model LegalDocument {
+  id        String       @id @default(cuid())
+  type      DocumentType
+  version   String
+  title     String
+  content   String // Contenuto completo del documento
+  contentEn String? // Versione inglese
+
+  isActive    Boolean   @default(false)
+  publishDate DateTime?
+
+  // Per tracciare i consensi legati a questa versione
+  consentRecords ConsentRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, version])
+  @@map("legal_documents")
+}
+
+// Gestione retention dei dati
+model DataRetentionPolicy {
+  id            String  @id @default(cuid())
+  dataType      String // "USER", "ORDER", "LOG", etc.
+  retentionDays Int // Giorni di conservazione
+  legalBasis    String // Base legale per la conservazione
+  description   String
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("data_retention_policies")
+}
+
+// Per gestire la cancellazione automatica dei dati
+model DeletionQueue {
+  id           String         @id @default(cuid())
+  dataType     String
+  recordId     String
+  scheduledFor DateTime // Quando il record deve essere cancellato
+  reason       String // "RETENTION_EXPIRED", "USER_REQUEST", etc.
+  status       DeletionStatus @default(PENDING)
+
+  processedAt DateTime?
+  error       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("deletion_queue")
+}
+
+// Model per pagamenti interni
+model PaymentTransaction {
+  id             String          @id @default(cuid())
+  orderId        String          @unique
+  order          Order           @relation("OrderPaymentTransaction", fields: [orderId], references: [id], onDelete: Cascade)
+  amount         Decimal         @db.Decimal(10, 2)
+  currency       String          @default("EUR")
+  status         PaymentTxStatus @default(INITIATED)
+  method         String? // "CARD", "BANK_TRANSFER", etc..
+  providerRef    String? // id interno/intent reference (anche se no-3rd-party, utile per correlazione)
+  authCode       String?
+  failureCode    String?
+  failureMessage String?
+  cardBrand      String? // es. "VISA", "MASTERCARD"
+  cardLast4      String? // solo ultime 4 cifre - mai PAN completo
+
+  capturedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  events     PaymentEvent[]
+
+  @@index([status])
+  @@map("payment_transactions")
+}
+
+model PaymentEvent {
+  id            String             @id @default(cuid())
+  transactionId String
+  transaction   PaymentTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  type          PaymentEventType
+  message       String?
+  payload       Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([transactionId])
+  @@map("payment_events")
+}
+
+enum PaymentTxStatus {
+  INITIATED
+  AUTHORIZED
+  CAPTURED
+  PARTIALLY_CAPTURED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentEventType {
+  INIT
+  AUTH_REQUEST
+  AUTH_SUCCESS
+  AUTH_FAIL
+  CAPTURE_REQUEST
+  CAPTURE_SUCCESS
+  CAPTURE_FAIL
+  REFUND_REQUEST
+  REFUND_SUCCESS
+  REFUND_FAIL
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  ANONYMIZED
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+}
+
+enum OrderStatus {
+  PENDING
+  AGE_VERIFICATION_REQUIRED
+  AGE_VERIFIED
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+enum GdprRequestType {
+  ACCESS // Diritto di accesso (Art. 15)
+  RECTIFICATION // Diritto di rettifica (Art. 16)
+  ERASURE // Diritto di cancellazione (Art. 17)
+  RESTRICTION // Diritto di limitazione (Art. 18)
+  PORTABILITY // Diritto di portabilità (Art. 20)
+  OBJECTION // Diritto di opposizione (Art. 21)
+  AUTOMATED_DECISION // Opposizione a decisioni automatizzate (Art. 22)
+}
+
+enum GdprRequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+enum DocumentType {
+  PRIVACY_POLICY
+  COOKIE_POLICY
+  TERMS_OF_SERVICE
+  GDPR_NOTICE
+}
+
+enum DeletionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
 }

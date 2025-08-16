@@ -1,0 +1,28 @@
+{
+  "navigation": {
+    "home": "Home",
+    "products": "Prodotti",
+    "about": "Chi Siamo",
+    "contact": "Contatti",
+    "cart": "Carrello",
+    "login": "Accedi",
+    "register": "Registrati"
+  },
+  "hero": {
+    "title": "Rebus International Srl",
+    "subtitle": "Distributore per l'Italia del Gin DryCat",
+    "cta": "Scopri i nostri prodotti"
+  },
+  "products": {
+    "title": "I nostri Gin",
+    "viewAll": "Vedi Tutti",
+    "addToCart": "Aggiungi al carrello",
+    "outOfStock": "Esaurito"
+  },
+  "cart": {
+    "title": "Carrello",
+    "empty": "Il tuo carrello è vuoto",
+    "total": "Totale",
+    "checkout": "Procedi all'acquisto"
+  }
+}
