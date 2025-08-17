@@ -1,14 +1,14 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
-const withIntl = createNextIntlPlugin();
+const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
     remotePatterns: [
       {
-        protocol: "http",
+        protocol: "https",
         hostname: "localhost",
       }
       // qua aggiungieremo i protocolli reali es:
@@ -20,4 +20,4 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default withIntl(nextConfig);
+export default withNextIntl(nextConfig);
