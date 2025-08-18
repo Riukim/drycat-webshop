@@ -29,6 +29,7 @@ export default function RegisterPage() {
     acceptMarketing: false,
   });
 
+  // @ts-ignore
   const [error, setErrors] = useState<FieldErrors>("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -447,7 +448,7 @@ export default function RegisterPage() {
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  Ho letto e accetto l'{" "}
+                  Ho letto e accetto l&#39;{" "}
                   <a
                     href={`/`}
                     className="text-indigo-600 hover:text-indigo-800 underline"

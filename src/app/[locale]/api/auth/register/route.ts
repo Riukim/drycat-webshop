@@ -175,10 +175,10 @@ export async function POST(req: Request) {
 // Metodo per richiedere info utente
 export async function GET() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const sessionToken = cookieStore.get("session_token")?.value
 
-    if (!sessionCookie) {
+    if (!sessionToken) {
       return NextResponse.json(
         {
           error: "Not authenticated",
@@ -192,7 +192,7 @@ export async function GET() {
     if (!session) {
       return NextResponse.json(
         {error: "Invalid session."},
-        {staus: 401}
+        {status: 401}
       )
     }
 
@@ -324,6 +324,7 @@ export async function DELETE(request: Request) {
     console.error('Delete user error:', error);
 
     if (error instanceof PrismaClient.PrismaClientKnownRequestError) {
+      // @ts-ignore
       if (error.code === 'P2025') {
         // Record to delete does not exist
         return NextResponse.json(
