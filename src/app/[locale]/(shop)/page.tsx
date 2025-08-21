@@ -1,20 +1,25 @@
-import {useTranslations} from 'next-intl';
 import SiteHeader from "@/components/ui/site-header";
 import Hero from "@/components/ui/hero";
-import FeatureCards from "@/components/ui/feture-cards";
-import BottleShowcase from "@/components/ui/bottle-showcase";
+import GinShowcase from "@/components/ui/bottle-showcase";
+import { useTranslations, useLocale } from 'next-intl';
 
 export default function Home({ params }: { params: { locale: string } }) {
   const t = useTranslations('hero');
-  const locale = params?.locale || "it"
+  const locale = useLocale();
 
   return (
     <main className="">
       <SiteHeader locale={locale}/>
-      <Hero locale={locale}/>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="h-px bg-border" /></div>
-      <FeatureCards />
-      <BottleShowcase />
+          <Hero locale={locale}/>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col space-y-16 md:space-y-24">
+      {/*<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="h-px bg-border" /></div>*/}
+      {/*<FeatureCards />*/}
+          <div className="h-px bg-border" />
+
+          <GinShowcase />
+        </div>
+      </div>
       <footer className="py-5 md:py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} DryCat Distillers</p>

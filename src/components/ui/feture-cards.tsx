@@ -1,96 +1,179 @@
-"use client"
+"use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 
 const FEATURES = [
   {
-    title: "Precise Distillation",
-    body: "Slow distillation for a clean, layered profile.",
+    title: "Gin Seco",
+    body:
+      "Una bevanda dalla personalità unica, con una deliziosa infusione di spezie tropicali, mediterranee e asiatiche.",
     key: "distillation",
     img: "/branding/drycatBianco.png",
   },
   {
-    title: "Curated Botanicals",
-    body: "Juniper-forward, complemented by restrained citrus.",
+    title: "London Dry",
+    body:
+      "Un gin traslucido e classico. Caratterizzato da una forte presenza di ginepro, con ingredienti tradizionali, è realizzato a partire da una distillazione tradizionale senza infusione di vegetali. Il risultato è un gin neutro, agrumato, rinfrescante e con note di erbe.",
     key: "botanicals",
     img: "/branding/drycatNero.png",
   },
   {
-    title: "Monochrome Aesthetic",
-    body: "Minimal design, maximum character—timeless and bold.",
+    title: "Gin Premium",
+    body:
+      "Realizzato con distillazione esclusiva e segreta. Una vera e propria alchimia sviluppata da foglie di mango, limone Tahiti e siciliano, prodotta al di fuori della fabbrica, in modo organico e sostenibile.",
     key: "design",
     img: "/branding/drycatVerde.png",
   },
+  {
+    title: "Gin Pink",
+    body:
+      "Una variazione della formula originale, questa bevanda è stata creata con una gradazione alcolica del 38% e una dolcezza ben caratteristica, proveniente dalla ciliegia e dall’ibisco.",
+    key: "design2",
+    img: "/branding/drycatPink.png",
+  },
 ];
 
-export default function FeatureCarousel() {
-  // Creiamo 3 set per garantire un loop fluido
-  const items = React.useMemo(() => [...FEATURES, ...FEATURES, ...FEATURES], []);
-  const trackRef = useRef(null);
-  const [isPaused, setIsPaused] = useState(false);
+export default function FeatureCarousel({ speed = 30 }: { speed?: number }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const offsetRef = useRef(0);
+  const lastTsRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const pausedRef = useRef(false);
+  const gapPxRef = useRef(24);
+
+  const [repeat, setRepeat] = useState(6);
+  const items = useMemo(
+    () => Array.from({ length: repeat }).flatMap(() => FEATURES),
+    [repeat]
+  );
 
   useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
+    const vp = viewportRef.current;
+    const tr = trackRef.current;
+    if (!vp || !tr) return;
 
-    const updateAnimation = () => {
-      // Calcola la larghezza di un singolo set di elementi
-      const cardWidth = 300 + 24; // larghezza card + gap
-      const singleSetWidth = FEATURES.length * cardWidth;
+    const compute = () => {
+      const styles = getComputedStyle(tr);
+      const gapStr = (styles.columnGap || styles.gap || "24px").toString();
+      const gapVal = parseFloat(gapStr);
+      gapPxRef.current = Number.isFinite(gapVal) ? gapVal : 24;
 
-      // Velocità di scorrimento (pixel per secondo)
-      const pxPerSecond = 50;
-      const durationSec = singleSetWidth / pxPerSecond;
+      const firstCard = tr.querySelector<HTMLElement>("[data-card]");
+      if (!firstCard) return;
 
-      el.style.setProperty("--marquee-duration", `${durationSec}s`);
-      el.style.setProperty("--single-set-width", `${singleSetWidth}px`);
+      const cardW = firstCard.getBoundingClientRect().width + gapPxRef.current;
+      const vpW = vp.getBoundingClientRect().width;
+
+      const minItems = Math.ceil((3 * vpW) / cardW);
+      const needRepeats = Math.max(2, Math.ceil(minItems / FEATURES.length));
+      setRepeat(needRepeats);
     };
 
-    updateAnimation();
-    window.addEventListener("resize", updateAnimation);
-    return () => window.removeEventListener("resize", updateAnimation);
+    const id = requestAnimationFrame(compute);
+    const ro = new ResizeObserver(compute);
+    ro.observe(vp);
+    ro.observe(tr);
+
+    return () => {
+      cancelAnimationFrame(id);
+      ro.disconnect();
+    };
   }, []);
 
-  return (
-    <section
-      className="relative w-full overflow-hidden py-12 md:py-20 bg-background"
-      aria-label="Feature carousel"
-    >
-      <div className="mb-8 text-center">
-        <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-          Our Premium Gin
-        </h2>
-        <p className="text-muted-foreground">Discover what makes our product exceptional</p>
-      </div>
+  useEffect(() => {
+    const animate = (ts: number) => {
+      if (pausedRef.current) {
+        lastTsRef.current = ts;
+        rafRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      if (!lastTsRef.current) lastTsRef.current = ts;
+      const dt = (ts - lastTsRef.current) / 1000;
+      lastTsRef.current = ts;
 
+      const tr = trackRef.current;
+      if (tr) {
+        offsetRef.current -= speed * dt;
+
+        let first = tr.firstElementChild as HTMLElement | null;
+        while (first) {
+          const w = first.getBoundingClientRect().width + gapPxRef.current;
+          if (-offsetRef.current >= w) {
+            offsetRef.current += w;
+            tr.appendChild(first);
+            first = tr.firstElementChild as HTMLElement | null;
+          } else {
+            break;
+          }
+        }
+
+        tr.style.transform = `translateX(${offsetRef.current}px)`;
+      }
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      lastTsRef.current = null;
+    };
+  }, [speed, items.length]);
+
+  const onEnter = () => (pausedRef.current = true);
+  const onLeave = () => {
+    pausedRef.current = false;
+    lastTsRef.current = null;
+  };
+
+  return (
+    <section className="relative w-full overflow-hidden py-6 md:py-8">
       <div
-        ref={trackRef}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        className={`marquee-track ${isPaused ? "marquee-paused" : ""}`}
+        ref={viewportRef}
+        className="w-full overflow-visible"
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onTouchStart={onEnter}
+        onTouchEnd={onLeave}
       >
-        {items.map((feature, idx) => (
-          <div key={`${feature.key}-${idx}`} className="marquee-item">
-            <div className="min-w-[300px] max-w-xs flex-shrink-0 rounded-2xl border-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <div className="p-6">
-                <h3 className="text-lg md:text-xl font-semibold text-card-foreground mb-4">
-                  {feature.title}
-                </h3>
-                <div className="mb-4">
-                  <img
-                    src={feature.img}
-                    alt={feature.title}
-                    className="h-40 w-full rounded-md object-cover"
-                    loading="lazy"
-                  />
+        <div
+          ref={trackRef}
+          className="flex items-stretch gap-6 will-change-transform overflow-visible"
+        >
+          {items.map((f, i) => (
+            <div
+              key={`${f.key}-${i}`}
+              data-card
+              className="flex-shrink-0 w-[300px]"
+            >
+              <div
+                className="h-full flex flex-col cursor-pointer rounded-2xl border bg-card/80 backdrop-blur-sm shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-xl z-10 hover:z-20"
+                style={{ borderColor: "var(--border)" }}
+              >
+                <div className="p-6 flex flex-col flex-1">
+                  <h3 className="text-lg md:text-xl font-semibold">{f.title}</h3>
+
+                  <div className="my-4">
+                    <Image
+                      src={f.img}
+                      alt={f.title}
+                      width={300}
+                      height={160}
+                      className="w-full h-[160px] rounded-md object-cover"
+                      priority
+                    />
+                  </div>
+
+                  <p className="text-sm text-muted-foreground my-4">{f.body}</p>
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {feature.body}
-                </p>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );
